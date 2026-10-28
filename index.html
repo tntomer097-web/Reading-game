@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f8ff">
+  <title>Read & Ding! — Reading Game</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2942;
+      --muted: #5f6d86;
+      --blue: #345be8;
+      --blue-dark: #2444bf;
+      --paper: #ffffff;
+      --bg: #f3f6ff;
+      --green: #16845d;
+      --red: #b42335;
+      --gold: #ffca4b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; padding: 20px;
+      display: grid; place-items: center;
+      font-family: ui-rounded, "Arial Rounded MT Bold", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 15%, #dfe8ff 0 8%, transparent 8.3%),
+        radial-gradient(circle at 88% 80%, #e1f8ed 0 10%, transparent 10.3%),
+        var(--bg);
+    }
+    button, select { font: inherit; }
+    .app { width: min(100%, 760px); }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .brand { font-size: clamp(1.15rem, 3vw, 1.6rem); font-weight: 900; letter-spacing: -.04em; }
+    .brand span { color: var(--blue); }
+    .score {
+      background: #fff; border: 2px solid #e1e7fb; border-radius: 18px;
+      padding: 9px 15px; text-align: center; min-width: 105px; box-shadow: 0 5px 16px #203d8010;
+    }
+    .score-label { display: block; font-size: .72rem; color: var(--muted); font-weight: 800; letter-spacing: .08em; }
+    #score { font-size: 1.5rem; font-weight: 900; color: var(--blue); font-variant-numeric: tabular-nums; }
+    .card {
+      position: relative; overflow: hidden; background: var(--paper); border: 2px solid #e2e8fb;
+      border-radius: 28px; padding: clamp(18px, 5vw, 38px);
+      box-shadow: 0 18px 55px #243f8014;
+    }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .pill { border-radius: 999px; background: #edf1ff; color: #304cc3; padding: 7px 12px; font-weight: 800; font-size: .85rem; }
+    .level-select { border: 2px solid #dce4fb; background: white; color: var(--ink); border-radius: 12px; padding: 8px 10px; max-width: 100%; }
+    .prompt { text-align: center; padding: clamp(28px, 7vw, 55px) 0 24px; }
+    .instruction { color: var(--muted); font-weight: 750; margin: 0 0 10px; }
+    #word {
+      margin: 0; font-size: clamp(3.3rem, 15vw, 7rem); line-height: 1.06; letter-spacing: -.055em;
+      overflow-wrap: anywhere; color: var(--ink); font-weight: 950;
+    }
+    #word .letter { display: inline-block; }
+    .status {
+      min-height: 54px; display: flex; align-items: center; justify-content: center; gap: 9px;
+      padding: 12px; border-radius: 16px; background: #f5f7fd; color: #4c5a74;
+      text-align: center; font-weight: 750; line-height: 1.35;
+    }
+    .status.listening { background: #e8f8f0; color: #116946; }
+    .status.error { background: #fff0f1; color: var(--red); }
+    .status.success { background: #fff7d9; color: #805500; }
+    .mic-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+    .listening .mic-dot { animation: pulse 1.25s infinite; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
+    button {
+      border: 0; border-radius: 15px; padding: 14px 19px; cursor: pointer;
+      font-weight: 850; transition: transform .15s, background .15s, opacity .15s;
+    }
+    button:hover:not(:disabled) { transform: translateY(-2px); }
+    button:focus-visible, select:focus-visible { outline: 3px solid #8ea5ff; outline-offset: 3px; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .primary { background: var(--blue); color: white; box-shadow: 0 6px 0 var(--blue-dark); }
+    .primary:hover:not(:disabled) { background: #294ed7; }
+    .secondary { background: #edf1fb; color: #2e3b57; }
+    .small { padding: 11px 14px; font-size: .92rem; }
+    .progress-wrap { margin-top: 24px; }
+    .progress-meta { display: flex; justify-content: space-between; gap: 10px; font-size: .85rem; color: var(--muted); font-weight: 800; margin-bottom: 8px; }
+    .track { height: 10px; background: #e8edf9; border-radius: 999px; overflow: hidden; }
+    #progress { height: 100%; width: 0%; background: linear-gradient(90deg, #6483ff, #39c995); border-radius: inherit; transition: width .35s; }
+    .help { color: var(--muted); font-size: .9rem; line-height: 1.55; margin: 18px 3px 0; }
+    .help strong { color: var(--ink); }
+    .sparkle { position: absolute; pointer-events: none; font-size: 1.7rem; animation: burst 900ms ease-out forwards; z-index: 2; }
+    .word-success { animation: wordPop .48s cubic-bezier(.2,1.6,.4,1); color: var(--green) !important; }
+    .card.success-flash { animation: cardFlash .55s ease-out; }
+    @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.65); opacity: .5; } }
+    @keyframes wordPop { 0% { transform: scale(.75) rotate(-2deg); } 65% { transform: scale(1.1) rotate(1deg); } 100% { transform: scale(1); } }
+    @keyframes cardFlash { 0% { box-shadow: 0 18px 55px #243f8014; } 35% { box-shadow: 0 0 0 8px #ffdf78a8, 0 18px 55px #243f8020; } 100% { box-shadow: 0 18px 55px #243f8014; } }
+    @keyframes burst { 0% { opacity: 0; transform: translate(0,0) scale(.3) rotate(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx),var(--dy)) scale(1.25) rotate(45deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div class="brand">Read <span>&</span> Ding!</div>
+      <div class="score" aria-live="polite">
+        <span class="score-label">WORDS READ</span>
+        <span id="score">0</span>
+      </div>
+    </header>
+
+    <section class="card" id="card" aria-labelledby="word">
+      <div class="topline">
+        <span class="pill" id="levelPill">Level 1 · Easy words</span>
+        <label>
+          <span class="sr-only" style="position:absolute;left:-9999px">Word difficulty</span>
+          <select class="level-select" id="levelSelect" aria-label="Word difficulty">
+            <option value="0">Level 1 — Easy</option>
+            <option value="1">Level 2 — Growing</option>
+            <option value="2">Level 3 — Tricky</option>
+            <option value="3">Level 4 — Challenge</option>
+            <option value="auto">Progressive levels</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="prompt">
+        <p class="instruction">Read this word out loud</p>
+        <h1 id="word" aria-live="polite" aria-atomic="true">cat</h1>
+      </div>
+
+      <div class="status" id="status" role="status" aria-live="polite">
+        <span class="mic-dot" aria-hidden="true"></span>
+        <span id="statusText">Press Start and allow microphone access.</span>
+      </div>
+
+      <div class="controls">
+        <button class="primary" id="startBtn" type="button">Start listening</button>
+        <button class="secondary" id="stopBtn" type="button" disabled>Stop</button>
+        <button class="secondary small" id="skipBtn" type="button">Skip word</button>
+        <button class="secondary small" id="resetBtn" type="button">Reset score</button>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-meta">
+          <span id="progressLabel">Level progress</span>
+          <span id="progressCount">0 / 5 words</span>
+        </div>
+        <div class="track" role="progressbar" aria-label="Progress to next level" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0" id="progressTrack">
+          <div id="progress"></div>
+        </div>
+      </div>
+    </section>
+
+    <p class="help">
+      <strong>How to play:</strong> Press <strong>Start listening</strong>, allow microphone access, and say the word on the screen.
+      When the browser recognises it, you'll hear a ding, see a celebration, and get a new word.
+      For best results, use Chrome on Android or desktop with an internet connection.
+    </p>
+    <p class="help" id="browserNote"></p>
+  </main>
+
+  <script>
+  (() => {
+    "use strict";
+
+    const wordBanks = [
+      ["cat", "dog", "sun", "hat", "map", "bed", "cup", "pig", "run", "red", "big", "hop", "mum", "dad", "bug", "pen", "fox", "jam", "leg", "top", "fish", "ship", "frog", "hand", "milk", "duck", "sock", "tree", "star", "rain"],
+      ["apple", "happy", "rabbit", "window", "yellow", "garden", "pencil", "monkey", "kitten", "sunny", "basket", "rocket", "pillow", "dinner", "little", "flower", "purple", "winter", "button", "carpet", "sister", "thunder", "picnic", "napkin", "jungle", "pocket", "sunset", "market", "cookie", "dragon"],
+      ["because", "another", "birthday", "remember", "elephant", "computer", "adventure", "together", "tomorrow", "beautiful", "discover", "important", "chocolate", "different", "wonderful", "playground", "yesterday", "butterfly", "sandwich", "triangle", "hospital", "holiday", "carefully", "anything", "everyone", "mountain", "dinosaur", "invisible", "fantastic", "surprise"],
+      ["brilliant", "enormous", "curiosity", "celebrate", "imagination", "mysterious", "independent", "electricity", "opportunity", "temperature", "particularly", "comfortable", "extraordinary", "investigate", "responsible", "neighbourhood", "determination", "conversation", "concentration", "magnificent", "information", "experiment", "competition", "explanation", "environment", "magnifying", "unbelievable", "interesting", "disappointed", "celebration"]
+    ];
+
+    const el = id => document.getElementById(id);
+    const wordEl = el("word");
+    const card = el("card");
+    const scoreEl = el("score");
+    const status = el("status");
+    const statusText = el("statusText");
+    const startBtn = el("startBtn");
+    const stopBtn = el("stopBtn");
+    const skipBtn = el("skipBtn");
+    const resetBtn = el("resetBtn");
+    const levelSelect = el("levelSelect");
+    const levelPill = el("levelPill");
+    const progress = el("progress");
+    const progressCount = el("progressCount");
+    const progressTrack = el("progressTrack");
+    const progressLabel = el("progressLabel");
+    const browserNote = el("browserNote");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let listening = false;
+    let shouldListen = false;
+    let restarting = false;
+    let score = 0;
+    let currentLevel = 0;
+    let levelCorrect = 0;
+    let currentWord = "";
+    let recentWords = [];
+    let lastCorrectAt = 0;
+    let restartTimer = null;
+    let recognitionGeneration = 0;
+    let audioContext = null;
+
+    function setStatus(message, mode = "") {
+      status.className = "status" + (mode ? " " + mode : "");
+      statusText.textContent = message;
+    }
+
+    function selectedLevel() {
+      return levelSelect.value === "auto" ? "auto" : Number(levelSelect.value);
+    }
+
+    function updateLevelUI() {
+      const names = ["Easy words", "Growing words", "Tricky words", "Challenge words"];
+      levelPill.textContent = `Level ${currentLevel + 1} · ${names[currentLevel]}`;
+      const count = levelCorrect % 5;
+      progress.style.width = `${(count / 5) * 100}%`;
+      progressCount.textContent = `${count} / 5 words`;
+      progressTrack.setAttribute("aria-valuenow", String(count));
+      progressLabel.textContent = selectedLevel() === "auto" ? "Progress to next level" : "Level progress";
+    }
+
+    function pickWord() {
+      const bank = wordBanks[currentLevel];
+      let options = bank.filter(w => w !== currentWord && !recentWords.includes(w));
+      if (!options.length) options = bank.filter(w => w !== currentWord);
+      if (!options.length) options = bank;
+      const next = options[Math.floor(Math.random() * options.length)];
+      recentWords.push(next);
+      if (recentWords.length > 5) recentWords.shift();
+      currentWord = next;
+      wordEl.textContent = currentWord;
+      wordEl.classList.remove("word-success");
+      updateLevelUI();
+    }
+
+    function normalise(text) {
+      return text.toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\p{L}\p{N}' -]/gu, " ").trim().replace(/\s+/g, " ");
+    }
+
+    function playDing() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        if (!audioContext) audioContext = new AudioCtx();
+        if (audioContext.state === "suspended") audioContext.resume();
+        const now = audioContext.currentTime;
+        [880, 1174.66].forEach((freq, i) => {
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(freq, now + i * 0.105);
+          gain.gain.setValueAtTime(0.0001, now + i * 0.105);
+          gain.gain.exponentialRampToValueAtTime(0.18, now + i * 0.105 + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.105 + 0.28);
+          oscillator.connect(gain);
+          gain.connect(audioContext.destination);
+          oscillator.start(now + i * 0.105);
+          oscillator.stop(now + i * 0.105 + 0.3);
+        });
+      } catch (_) {
+        // Audio is a bonus; the game still works if sound is unavailable.
+      }
+    }
+
+    function confetti() {
+      const symbols = ["✦", "★", "●", "✧", "✿"];
+      const rect = card.getBoundingClientRect();
+      for (let i = 0; i < 14; i++) {
+        const bit = document.createElement("span");
+        bit.className = "sparkle";
+        bit.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+        bit.style.left = `${Math.max(5, Math.min(95, 15 + Math.random() * 70))}%`;
+        bit.style.top = `${Math.max(15, Math.min(80, rect.height * 0.35))}px`;
+        bit.style.setProperty("--dx", `${Math.round((Math.random() - .5) * 220)}px`);
+        bit.style.setProperty("--dy", `${Math.round((Math.random() - .5) * 140 - 45)}px`);
+        bit.style.color = ["#345be8", "#e69a13", "#16845d", "#c64e9d"][i % 4];
+        card.appendChild(bit);
+        setTimeout(() => bit.remove(), 1000);
+      }
+    }
+
+    function celebrate() {
+      const now = Date.now();
+      if (now - lastCorrectAt < 900) return;
+      lastCorrectAt = now;
+      score += 1;
+      levelCorrect += 1;
+      scoreEl.textContent = String(score);
+      wordEl.classList.remove("word-success");
+      void wordEl.offsetWidth;
+      wordEl.classList.add("word-success");
+      card.classList.remove("success-flash");
+      void card.offsetWidth;
+      card.classList.add("success-flash");
+      setStatus("Correct! Great reading!", "success");
+      playDing();
+      confetti();
+
+      if (selectedLevel() === "auto" && levelCorrect > 0 && levelCorrect % 5 === 0 && currentLevel < wordBanks.length - 1) {
+        currentLevel += 1;
+        setStatus(`Level up! Now try ${["easy", "growing", "tricky", "challenge"][currentLevel]} words!`, "success");
+      }
+      updateLevelUI();
+      // Brief pause lets the success feedback register before the next word.
+      const generation = recognitionGeneration;
+      setTimeout(() => {
+        if (generation !== recognitionGeneration) return;
+        pickWord();
+        if (shouldListen) setStatus("Listening… say the word on the screen.", "listening");
+      }, 700);
+    }
+
+    function handleTranscript(transcript, isFinal) {
+      if (!shouldListen || !isFinal) return;
+      const heard = normalise(transcript);
+      const target = normalise(currentWord);
+      if (!heard || !target) return;
+
+      // Exact whole-utterance match avoids accidentally scoring a word embedded in a sentence.
+      // Some recognisers add a short extra word; accept only a very close single-word match.
+      if (heard === target) {
+        celebrate();
+        return;
+      }
+      const tokens = heard.split(" ");
+      if (tokens.length === 1 && tokens[0] === target) celebrate();
+    }
+
+    function setupRecognition() {
+      if (!SpeechRecognition) return false;
+      recognition = new SpeechRecognition();
+      recognition.lang = "en-AU";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 3;
+
+      recognition.onstart = () => {
+        listening = true;
+        restarting = false;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        setStatus("Listening… say the word on the screen.", "listening");
+      };
+
+      recognition.onresult = event => {
+        if (!shouldListen) return;
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          for (let j = 0; j < Math.min(result.length, 3); j++) {
+            handleTranscript(result[j].transcript, result.isFinal);
+          }
+        }
+      };
+
+      recognition.onerror = event => {
+        const messages = {
+          "not-allowed": "Microphone permission is blocked. Allow microphone access in your browser settings, then press Start again.",
+          "service-not-allowed": "Speech recognition is blocked by this browser or device. Try Chrome with an internet connection.",
+          "audio-capture": "No working microphone was found. Connect or enable a microphone, then try again.",
+          "network": "Speech recognition needs a working internet connection in this browser. Check your connection and try again.",
+          "no-speech": "I didn't hear speech. Keep the microphone near you and try saying the word again.",
+          "aborted": "Listening stopped."
+        };
+        if (event.error === "no-speech") {
+          if (shouldListen) setStatus("I didn't hear that yet. Try saying the word again.", "listening");
+          return;
+        }
+        if (event.error === "aborted" && shouldListen) return;
+        if (event.error === "not-allowed" || event.error === "service-not-allowed" || event.error === "audio-capture" || event.error === "network") {
+          shouldListen = false;
+          listening = false;
+          clearTimeout(restartTimer);
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          setStatus(messages[event.error] || "Speech recognition error. Please try again.", "error");
+        } else if (event.error !== "aborted") {
+          setStatus(messages[event.error] || `Microphone issue (${event.error}). Try again or use another browser.`, "error");
+        }
+      };
+
+      recognition.onend = () => {
+        listening = false;
+        if (shouldListen) {
+          // SpeechRecognition may end after silence on some browsers. Restart it safely.
+          clearTimeout(restartTimer);
+          restartTimer = setTimeout(() => {
+            if (!shouldListen || listening || restarting) return;
+            try {
+              restarting = true;
+              recognition.start();
+            } catch (_) {
+              restarting = false;
+              if (shouldListen) {
+                setStatus("Listening paused by the browser. Press Start listening to resume.", "error");
+                shouldListen = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+              }
+            }
+          }, 250);
+        } else {
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+        }
+      };
+      return true;
+    }
+
+    function startListening() {
+      if (!SpeechRecognition) {
+        setStatus("Speech recognition isn't supported here. Open this page in a current version of Chrome on Android or desktop.", "error");
+        return;
+      }
+      if (shouldListen) return;
+      shouldListen = true;
+      recognitionGeneration++;
+      try {
+        if (!recognition) setupRecognition();
+        if (audioContext && audioContext.state === "suspended") audioContext.resume();
+        recognition.start();
+      } catch (err) {
+        shouldListen = false;
+        listening = false;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        setStatus("Couldn't start the microphone. Check its permission and make sure another listening session isn't running, then try again.", "error");
+      }
+    }
+
+    function stopListening() {
+      shouldListen = false;
+      recognitionGeneration++;
+      clearTimeout(restartTimer);
+      if (recognition && listening) {
+        try { recognition.stop(); } catch (_) {}
+      }
+      listening = false;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      setStatus("Listening stopped. Press Start when you're ready to play.");
+    }
+
+    startBtn.addEventListener("click", startListening);
+    stopBtn.addEventListener("click", stopListening);
+    skipBtn.addEventListener("click", () => {
+      recognitionGeneration++;
+      pickWord();
+      if (shouldListen) setStatus("New word. Listening…", "listening");
+      else setStatus("Word skipped. Press Start when you're ready.");
+    });
+    resetBtn.addEventListener("click", () => {
+      score = 0;
+      levelCorrect = 0;
+      currentLevel = selectedLevel() === "auto" ? 0 : selectedLevel();
+      scoreEl.textContent = "0";
+      recentWords = [];
+      recognitionGeneration++;
+      pickWord();
+      setStatus(shouldListen ? "Score reset. Listening… say the word on the screen." : "Score reset. Press Start when you're ready.", shouldListen ? "listening" : "");
+    });
+    levelSelect.addEventListener("change", () => {
+      currentLevel = selectedLevel() === "auto" ? 0 : selectedLevel();
+      levelCorrect = 0;
+      recentWords = [];
+      recognitionGeneration++;
+      pickWord();
+      setStatus(shouldListen ? "Difficulty changed. Listening… say the new word." : "Difficulty changed. Press Start when you're ready.", shouldListen ? "listening" : "");
+    });
+
+    if (!SpeechRecognition) {
+      browserNote.textContent = "Your current browser may not support speech recognition. Try the latest Google Chrome on Android or desktop. Microphone access generally requires HTTPS, which GitHub Pages provides.";
+      startBtn.title = "Speech recognition is not supported in this browser";
+    } else {
+      browserNote.textContent = "Microphone access is used only while listening. Browser speech recognition may process audio through the browser provider's online service; this page does not store recordings.";
+    }
+
+    pickWord();
+    setStatus("Press Start and allow microphone access.");
+  })();
+  </script>
+</body>
+</html>
